@@ -1,0 +1,223 @@
+import tkinter as tk
+from tkinter import ttk
+from tkcalendar import DateEntry
+from tkinter import messagebox
+from collections import deque
+from tkinter import BooleanVar
+
+# Initialize the task list
+tasks = deque()
+
+# Function to add a new task
+def add_task():
+    task_name = entry_task_name.get()
+    due_date = calendar_due_date.get() if due_date_checkbox.get() else ""
+    category = entry_category.get() if entry_category.get() else ""
+    reminder_date = calendar_reminder_date.get() if reminder_date_checkbox.get() else ""
+    description = entry_description.get("1.0", tk.END).strip()
+    is_complete = False
+
+    if task_name:
+        tasks.append((task_name, is_complete, due_date, category, reminder_date, description))
+        update_task_display()
+        clear_entry_fields()
+    else:
+        messagebox.showerror("Invalid Task", "Please enter a task name.")
+
+# Function to delete a task
+def delete_task():
+    selected_items = task_treeview.selection()
+    if selected_items:
+        for item in selected_items:
+            task_name = task_treeview.item(item, "text")
+            remove_task_by_name(task_name)
+            task_treeview.delete(item)
+        messagebox.showinfo("Task Deleted", "Task has been deleted successfully.")
+    else:
+        messagebox.showerror("Invalid Selection", "Please select a task to delete.")
+
+# Function to remove a task by its name from the tasks deque
+def remove_task_by_name(task_name):
+    index = -1
+    for i, task in enumerate(tasks):
+        if task[0] == task_name:
+            index = i
+            break
+    if index != -1:
+        tasks.remove(tasks[index])
+
+# Function to edit a task
+def edit_task():
+    selected_item = task_treeview.selection()
+    if selected_item:
+        task_name = task_treeview.item(selected_item)["text"]
+        task_index = get_task_index_by_name(task_name)
+        selected_task = tasks[task_index]
+
+        edit_window = tk.Toplevel(window)
+        edit_window.title("Edit Task")
+
+        label_edit_task_name = tk.Label(edit_window, text="Task Name:")
+        label_edit_task_name.grid(row=0, column=0)
+        entry_edit_task_name = tk.Entry(edit_window, width=30)
+        entry_edit_task_name.insert(tk.END, selected_task[0])
+        entry_edit_task_name.grid(row=0, column=1, columnspan=3)
+
+        label_edit_complete = tk.Label(edit_window, text="Complete:")
+        label_edit_complete.grid(row=0, column=2)
+        complete_var = BooleanVar()
+        complete_var.set(selected_task[1])
+        checkbox_edit_complete = tk.Checkbutton(edit_window, variable=complete_var)
+        checkbox_edit_complete.grid(row=0, column=3)
+
+        label_edit_due_date = tk.Label(edit_window, text="Due Date:")
+        label_edit_due_date.grid(row=1, column=0)
+        calendar_edit_due_date = DateEntry(edit_window, date_pattern="yyyy-mm-dd")
+        calendar_edit_due_date.set_date(selected_task[2] if selected_task[2] else None)
+        calendar_edit_due_date.grid(row=1, column=1)
+
+        label_edit_category = tk.Label(edit_window, text="Category:")
+        label_edit_category.grid(row=1, column=2)
+        entry_edit_category = tk.Entry(edit_window, width=15)
+        entry_edit_category.insert(tk.END, selected_task[3])
+        entry_edit_category.grid(row=1, column=3)
+
+        label_edit_reminder_date = tk.Label(edit_window, text="Reminder Date:")
+        label_edit_reminder_date.grid(row=2, column=0)
+        calendar_edit_reminder_date = DateEntry(edit_window, date_pattern="yyyy-mm-dd")
+        calendar_edit_reminder_date.set_date(selected_task[4] if selected_task[4] else None)
+        calendar_edit_reminder_date.grid(row=2, column=1)
+
+        label_edit_description = tk.Label(edit_window, text="Description:")
+        label_edit_description.grid(row=3, column=0)
+        entry_edit_description = tk.Text(edit_window, height=4, width=30)
+        entry_edit_description.insert(tk.END, selected_task[5])
+        entry_edit_description.grid(row=3, column=1, columnspan=3, padx=5, pady=5)
+
+        def save_edited_task():
+            edited_task_name = entry_edit_task_name.get()
+            edited_is_complete = complete_var.get()
+            edited_due_date = calendar_edit_due_date.get() if due_date_checkbox.get() else ""
+            edited_category = entry_edit_category.get() if entry_edit_category.get() else ""
+            edited_reminder_date = calendar_edit_reminder_date.get() if reminder_date_checkbox.get() else ""
+            edited_description = entry_edit_description.get("1.0", tk.END).strip()
+
+            if edited_task_name:
+                tasks[task_index] = (
+                    edited_task_name,
+                    edited_is_complete,
+                    edited_due_date,
+                    edited_category,
+                    edited_reminder_date,
+                    edited_description
+                )
+                update_task_display()
+                edit_window.destroy()
+            else:
+                messagebox.showerror("Invalid Task", "Please enter a task name.")
+
+        button_save_edited_task = tk.Button(edit_window, text="Save Task", command=save_edited_task)
+        button_save_edited_task.grid(row=4, column=0, pady=5)
+
+    else:
+        messagebox.showerror("Invalid Selection", "Please select a task to edit.")
+
+# Function to get the index of a task by its name in the tasks deque
+def get_task_index_by_name(task_name):
+    for i, task in enumerate(tasks):
+        if task[0] == task_name:
+            return i
+    return -1
+
+# Function to update the task list display
+def update_task_display():
+    task_treeview.delete(*task_treeview.get_children())
+    for task in tasks:
+        task_name = task[0]
+        task_details = task[1:]
+        task_treeview.insert("", tk.END, text=task_name, values=(task_details[0],) + task_details[1:])
+
+# Function to clear the entry fields
+def clear_entry_fields():
+    entry_task_name.delete(0, tk.END)
+    calendar_due_date.set_date(None)
+    entry_category.delete(0, tk.END)
+    calendar_reminder_date.set_date(None)
+    entry_description.delete("1.0", tk.END)
+
+# Create the main window
+window = tk.Tk()
+window.title("Task Manager")
+
+# Create and position the entry fields
+label_task_name = tk.Label(window, text="Task Name:")
+label_task_name.grid(row=0, column=0)
+entry_task_name = tk.Entry(window, width=30)
+entry_task_name.grid(row=0, column=1, padx=5)
+
+label_due_date = tk.Label(window, text="Due Date:")
+label_due_date.grid(row=0, column=2)
+calendar_due_date = DateEntry(window, date_pattern="yyyy-mm-dd")
+calendar_due_date.grid(row=0, column=3)
+
+due_date_checkbox = tk.BooleanVar()
+checkbox_due_date = tk.Checkbutton(
+    window,
+    variable=due_date_checkbox,
+)
+checkbox_due_date.grid(row=0, column=4)
+
+label_category = tk.Label(window, text="Category:")
+label_category.grid(row=1, column=0)
+entry_category = tk.Entry(window, width=15)
+entry_category.grid(row=1, column=1, padx=5)
+
+label_reminder_date = tk.Label(window, text="Reminder Date:")
+label_reminder_date.grid(row=1, column=2)
+calendar_reminder_date = DateEntry(window, date_pattern="yyyy-mm-dd")
+calendar_reminder_date.grid(row=1, column=3)
+
+reminder_date_checkbox = tk.BooleanVar()
+checkbox_reminder_date = tk.Checkbutton(
+    window,
+    variable=reminder_date_checkbox,
+)
+checkbox_reminder_date.grid(row=1, column=4)
+
+label_description = tk.Label(window, text="Description:")
+label_description.grid(row=2, column=0)
+entry_description = tk.Text(window, height=4, width=30)
+entry_description.grid(row=2, column=1, columnspan=3, padx=5, pady=5)
+
+# Create and position the buttons
+button_add_task = tk.Button(window, text="Add Task", command=add_task)
+button_add_task.grid(row=3, column=0, pady=5)
+
+button_delete_task = tk.Button(window, text="Delete Task", command=delete_task)
+button_delete_task.grid(row=3, column=1, pady=5)
+
+button_edit_task = tk.Button(window, text="Edit Task", command=edit_task)
+button_edit_task.grid(row=3, column=2, pady=5)
+
+# Create and position the task list
+task_treeview = ttk.Treeview(window)
+task_treeview["columns"] = ("Complete", "Due Date", "Category", "Reminder Date", "Description")
+
+task_treeview.column("#0", width=150, minwidth=150, anchor=tk.W)
+task_treeview.column("Complete", width=60, minwidth=60, anchor=tk.CENTER)
+task_treeview.column("Due Date", width=100, minwidth=100, anchor=tk.CENTER)
+task_treeview.column("Category", width=80, minwidth=80, anchor=tk.CENTER)
+task_treeview.column("Reminder Date", width=100, minwidth=100, anchor=tk.CENTER)
+task_treeview.column("Description", width=200, minwidth=200, anchor=tk.W)
+
+task_treeview.heading("#0", text="Task Name", anchor=tk.W)
+task_treeview.heading("Complete", text="Complete", anchor=tk.CENTER)
+task_treeview.heading("Due Date", text="Due Date", anchor=tk.CENTER)
+task_treeview.heading("Category", text="Category", anchor=tk.CENTER)
+task_treeview.heading("Reminder Date", text="Reminder Date", anchor=tk.CENTER)
+task_treeview.heading("Description", text="Description", anchor=tk.W)
+
+task_treeview.grid(row=4, column=0, columnspan=5, padx=5, pady=5)
+
+# Run the main window loop
+window.mainloop()
