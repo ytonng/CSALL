@@ -118,10 +118,10 @@ class ManageAccountPage(tk.Frame):
         pass
 
     def back_to_task_manager(self, event):
+        # Destroy the current window
+        self.master.destroy()
         # Call the "task_manager" script or perform the desired action
         subprocess.call(["python", "todolist.py"])
-
-
 
 # Create the main tkinter window
 root = tk.Tk()
