@@ -254,6 +254,8 @@ heading_label = tk.Label(window, text="Welcome Back to Task Manager", font=("Ari
 heading_label.grid(row=0, column=0, columnspan=6,pady=30)
 # Define the function to be executed when the label is clicked
 def manage_account_clicked():
+    # Destroy the current window
+    window.destroy()
     # Call the external script using subprocess
     subprocess.call(["python", "q1.py"])
 manage_acc = tk.Label(
