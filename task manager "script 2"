@@ -6,244 +6,250 @@ from script3 import create_manage_account
 # Initialize the task list
 tasks = deque()
 
-# Function to add a new task
-def add_task():
-    task_name = entry_task_name.get()
-    description = entry_description.get("1.0", tk.END).strip()
-    category = entry_category.get() if entry_category.get() else ""
-    due_date = calendar_due_date.get() if due_date_checkbox.get() else ""
-    reminder_date = calendar_reminder_date.get() if reminder_date_checkbox.get() else ""
-
-    if task_name:
-        tasks.append((task_name, description, category, due_date, reminder_date, False, False))
-        update_task_display()
-        clear_fields_and_selection()
-    else:
-        messagebox.showerror("Invalid Task", "Please enter a task name.")
-
-# Function to delete a task
-def delete_task():
-    selected_items = task_treeview.selection()
-    if selected_items:
-        for item in selected_items:
-            task_name = task_treeview.item(item, "text")
-            remove_task_by_name(task_name)
-            task_treeview.delete(item)
-        messagebox.showinfo("Task Deleted", "Task has been deleted successfully.")
-    else:
-        messagebox.showerror("Invalid Selection", "Please select a task to delete.")
-
-# Function to search for tasks by name
-def search_tasks():
-    search_text = entry_search.get()
-    if search_text:
-        matching_tasks = [task for task in tasks if search_text.lower() in task[0].lower()]
-        if matching_tasks:
-            display_search_results(matching_tasks)
-        else:
-            messagebox.showinfo("No Matches", "No tasks match the search criteria.")
-    else:
-        messagebox.showwarning("Empty Search", "Please enter a search term.")
-
-# Function to display the search results
-def display_search_results(results):
-    task_treeview.delete(*task_treeview.get_children())
-    for task in results:
-        task_name, description, category, due_date, reminder_date, pin_status, complete_status = task
-        pin_status_text = "Pinned" if pin_status else ""
-        complete_status_text = "Complete" if complete_status else ""
-        task_treeview.insert("", tk.END, text=task_name, values=(description, category, reminder_date, due_date, pin_status_text, complete_status_text))
-
-# Function to remove a task by its name from the tasks deque
-def remove_task_by_name(task_name):
-    index = -1
-    for i, task in enumerate(tasks):
-        if task[0] == task_name:
-            index = i
-            break
-    if index != -1:
-        tasks.remove(tasks[index])
-
-def edit_task():
-    selected_items = task_treeview.selection()
-    if len(selected_items) == 1:
-        item = selected_items[0]
-        task_name = task_treeview.item(item, "text")
-        task_index = get_task_index_by_name(task_name)
-
-        if task_index != -1:
-            task = tasks[task_index]
-
-            entry_task_name.delete(0, tk.END)
-            entry_task_name.insert(0, task[0])
-
-            entry_description.delete("1.0", tk.END)
-            entry_description.insert(tk.END, task[1])
-
-            entry_category.delete(0, tk.END)
-            entry_category.insert(0, task[2])
-
-            due_date = task[3]
-            reminder_date = task[4]
-
-            # Reset checkbox values
-            due_date_checkbox.set(False)
-            reminder_date_checkbox.set(False)
-
-            # Set checkbox and calendar values based on task data
-            if due_date:
-                due_date_checkbox.set(True)
-                calendar_due_date.configure(state="normal")  # Enable the DateEntry widget
-                calendar_due_date.set_date(due_date)
-            else:
-                calendar_due_date.configure(state="disabled")  # Disable the DateEntry widget
-                calendar_due_date.set_date(None)  # Clear the calendar widget
-
-            if reminder_date:
-                reminder_date_checkbox.set(True)
-                calendar_reminder_date.configure(state="normal")  # Enable the DateEntry widget
-                calendar_reminder_date.set_date(reminder_date)
-            else:
-                calendar_reminder_date.configure(state="disabled")  # Disable the DateEntry widget
-                calendar_reminder_date.set_date(None)  # Clear the calendar widget
-
-            def save_task():
-                edited_task_name = entry_task_name.get()
-                edited_description = entry_description.get("1.0", tk.END).strip()
-                edited_category = entry_category.get() if entry_category.get() else ""
-                edited_due_date = calendar_due_date.get() if due_date_checkbox.get() else ""
-                edited_reminder_date = calendar_reminder_date.get() if reminder_date_checkbox.get() else ""
-
-                if edited_task_name:
-                    selected_items = task_treeview.selection()
-                    if len(selected_items) == 1:
-                        item = selected_items[0]
-                        task_name = task_treeview.item(item, "text")
-                        task_index = get_task_index_by_name(task_name)
-
-                        if task_index != -1:
-                            tasks[task_index] = (
-                                edited_task_name,
-                                edited_description,
-                                edited_category,
-                                edited_due_date,
-                                edited_reminder_date,
-                                task[5],
-                                task[6]
-                            )
-                            update_task_display()
-                            clear_fields_and_selection()
-                            messagebox.showinfo("Task Updated", "Task has been updated successfully.")
-                            window.focus()  # Remove focus from the Save Task button
-                        else:
-                            messagebox.showerror("Invalid Selection", "Please select a valid task.")
-                    else:
-                        messagebox.showerror("Invalid Selection", "Please select a task to edit.")
-                else:
-                    messagebox.showerror("Invalid Task", "Please enter a task name.")
-                    # Disable the DateEntry widgets if the checkboxes are not ticked
-                if not due_date_checkbox.get():
-                    calendar_due_date.configure(state="disabled")
-                if not reminder_date_checkbox.get():
-                    calendar_reminder_date.configure(state="disabled")
-
-            # Call the save_task function directly when clicking the Edit Task button
-            button_edit_task.config(text="Edit Task", command=save_task)
-        else:
-            messagebox.showerror("Invalid Selection", "Please select a valid task.")
-    else:
-        messagebox.showerror("Invalid Selection", "Please select a single task to edit.")
-
-# Function to get the index of a task by its name in the tasks deque
-def get_task_index_by_name(task_name):
-    for i, task in enumerate(tasks):
-        if task[0] == task_name:
-            return i
-    return -1
-
-def pin_task():
-    selected_items = task_treeview.selection()
-    if selected_items:
-        for item in selected_items:
-            task_name = task_treeview.item(item, "text")
-            task_index = get_task_index_by_name(task_name)
-
-            if task_index != -1:
-                task = tasks[task_index]
-                pin_status = not task[5]  # Toggle the pin status
-
-                tasks[task_index] = (
-                    task[0],
-                    task[1],
-                    task[2],
-                    task[3],
-                    task[4],
-                    pin_status,
-                    task[6]
-                )
-
-                update_task_display()
-                messagebox.showinfo("Task Pinned", f"Task '{task_name}' has been {'pinned' if pin_status else 'unpinned'} successfully.")
-            else:
-                messagebox.showerror("Invalid Selection", "Please select a valid task.")
-    else:
-        messagebox.showerror("Invalid Selection", "Please select a task to pin/unpin.")
-
-# Function to toggle the completion status of selected tasks
-def complete_task():
-    selected_items = task_treeview.selection()
-    if selected_items:
-        for item in selected_items:
-            task_name = task_treeview.item(item, "text")
-            task_index = get_task_index_by_name(task_name)
-
-            if task_index != -1:
-                task = tasks[task_index]
-                completion_status = not task[6]  # Toggle the completion status
-
-                tasks[task_index] = (
-                    task[0],
-                    task[1],
-                    task[2],
-                    task[3],
-                    task[4],
-                    task[5],
-                    completion_status
-                )
-
-                update_task_display()
-                messagebox.showinfo("Task Completed", f"Task '{task_name}' has been {'completed' if completion_status else 'incomplete'} successfully.")
-            else:
-                messagebox.showerror("Invalid Selection", "Please select a valid task.")
-    else:
-        messagebox.showerror("Invalid Selection", "Please select a task to mark as complete/incomplete.")
-
-# Function to update the task list display
-def update_task_display():
-    task_treeview.delete(*task_treeview.get_children())
-    for task in tasks:
-        task_name, description, category, due_date, reminder_date = task[:5]
-        pin_status = "Pinned" if task[5] else ""
-        complete_status = "Complete" if task[6] else ""
-        task_treeview.insert("", tk.END, text=task_name, values=(description, category, due_date, reminder_date, pin_status, complete_status))
-    task_treeview.bind("<Double-1>", lambda event: edit_task())
-
-# Function to clear the entry fields and selection
-def clear_fields_and_selection():
-    entry_search.delete(0, tk.END)  # Clear the search field
-    update_task_display()  # Reset the task list display
-    entry_task_name.delete(0, tk.END)
-    entry_description.delete("1.0", tk.END)
-    entry_category.delete(0, tk.END)
-    calendar_due_date.configure(state="disabled")  # Disable the DateEntry widget
-    calendar_due_date.set_date(None)  # Clear the calendar widget
-    calendar_reminder_date.configure(state="disabled")  # Disable the DateEntry widget
-    calendar_reminder_date.set_date(None)  # Clear the calendar widget
-    due_date_checkbox.set(False)
-    reminder_date_checkbox.set(False)
-    task_treeview.selection_remove(task_treeview.focus())
-
 def create_task_manager():
+    # Function to add a new task
+
+    def add_task():
+        task_name = entry_task_name.get()
+        description = entry_description.get("1.0", tk.END).strip()
+        category = entry_category.get() if entry_category.get() else ""
+        due_date = calendar_due_date.get() if due_date_checkbox.get() else ""
+        reminder_date = calendar_reminder_date.get() if reminder_date_checkbox.get() else ""
+
+        if task_name:
+            tasks.append((task_name, description, category, due_date, reminder_date, False, False))
+            update_task_display()
+            clear_fields_and_selection()
+        else:
+            messagebox.showerror("Invalid Task", "Please enter a task name.")
+
+    # Function to delete a task
+    def delete_task():
+        selected_items = task_treeview.selection()
+        if selected_items:
+            for item in selected_items:
+                task_name = task_treeview.item(item, "text")
+                remove_task_by_name(task_name)
+                task_treeview.delete(item)
+            messagebox.showinfo("Task Deleted", "Task has been deleted successfully.")
+        else:
+            messagebox.showerror("Invalid Selection", "Please select a task to delete.")
+
+    # Function to search for tasks by name
+    def search_tasks():
+        search_text = entry_search.get()
+        if search_text:
+            matching_tasks = [task for task in tasks if search_text.lower() in task[0].lower()]
+            if matching_tasks:
+                display_search_results(matching_tasks)
+            else:
+                messagebox.showinfo("No Matches", "No tasks match the search criteria.")
+        else:
+            messagebox.showwarning("Empty Search", "Please enter a search term.")
+
+    # Function to display the search results
+    def display_search_results(results):
+        task_treeview.delete(*task_treeview.get_children())
+        for task in results:
+            task_name, description, category, due_date, reminder_date, pin_status, complete_status = task
+            pin_status_text = "Pinned" if pin_status else ""
+            complete_status_text = "Complete" if complete_status else ""
+            task_treeview.insert("", tk.END, text=task_name, values=(
+            description, category, reminder_date, due_date, pin_status_text, complete_status_text))
+
+    # Function to remove a task by its name from the tasks deque
+    def remove_task_by_name(task_name):
+        index = -1
+        for i, task in enumerate(tasks):
+            if task[0] == task_name:
+                index = i
+                break
+        if index != -1:
+            tasks.remove(tasks[index])
+
+    def edit_task():
+        selected_items = task_treeview.selection()
+        if len(selected_items) == 1:
+            item = selected_items[0]
+            task_name = task_treeview.item(item, "text")
+            task_index = get_task_index_by_name(task_name)
+
+            if task_index != -1:
+                task = tasks[task_index]
+
+                entry_task_name.delete(0, tk.END)
+                entry_task_name.insert(0, task[0])
+
+                entry_description.delete("1.0", tk.END)
+                entry_description.insert(tk.END, task[1])
+
+                entry_category.delete(0, tk.END)
+                entry_category.insert(0, task[2])
+
+                due_date = task[3]
+                reminder_date = task[4]
+
+                # Reset checkbox values
+                due_date_checkbox.set(False)
+                reminder_date_checkbox.set(False)
+
+                # Set checkbox and calendar values based on task data
+                if due_date:
+                    due_date_checkbox.set(True)
+                    calendar_due_date.configure(state="normal")  # Enable the DateEntry widget
+                    calendar_due_date.set_date(due_date)
+                else:
+                    calendar_due_date.configure(state="disabled")  # Disable the DateEntry widget
+                    calendar_due_date.set_date(None)  # Clear the calendar widget
+
+                if reminder_date:
+                    reminder_date_checkbox.set(True)
+                    calendar_reminder_date.configure(state="normal")  # Enable the DateEntry widget
+                    calendar_reminder_date.set_date(reminder_date)
+                else:
+                    calendar_reminder_date.configure(state="disabled")  # Disable the DateEntry widget
+                    calendar_reminder_date.set_date(None)  # Clear the calendar widget
+
+                def save_task():
+                    edited_task_name = entry_task_name.get()
+                    edited_description = entry_description.get("1.0", tk.END).strip()
+                    edited_category = entry_category.get() if entry_category.get() else ""
+                    edited_due_date = calendar_due_date.get() if due_date_checkbox.get() else ""
+                    edited_reminder_date = calendar_reminder_date.get() if reminder_date_checkbox.get() else ""
+
+                    if edited_task_name:
+                        selected_items = task_treeview.selection()
+                        if len(selected_items) == 1:
+                            item = selected_items[0]
+                            task_name = task_treeview.item(item, "text")
+                            task_index = get_task_index_by_name(task_name)
+
+                            if task_index != -1:
+                                tasks[task_index] = (
+                                    edited_task_name,
+                                    edited_description,
+                                    edited_category,
+                                    edited_due_date,
+                                    edited_reminder_date,
+                                    task[5],
+                                    task[6]
+                                )
+                                update_task_display()
+                                clear_fields_and_selection()
+                                messagebox.showinfo("Task Updated", "Task has been updated successfully.")
+                                window.focus()  # Remove focus from the Save Task button
+                            else:
+                                messagebox.showerror("Invalid Selection", "Please select a valid task.")
+                        else:
+                            messagebox.showerror("Invalid Selection", "Please select a task to edit.")
+                    else:
+                        messagebox.showerror("Invalid Task", "Please enter a task name.")
+                        # Disable the DateEntry widgets if the checkboxes are not ticked
+                    if not due_date_checkbox.get():
+                        calendar_due_date.configure(state="disabled")
+                    if not reminder_date_checkbox.get():
+                        calendar_reminder_date.configure(state="disabled")
+
+                # Call the save_task function directly when clicking the Edit Task button
+                button_edit_task.config(text="Edit Task", command=save_task)
+            else:
+                messagebox.showerror("Invalid Selection", "Please select a valid task.")
+        else:
+            messagebox.showerror("Invalid Selection", "Please select a single task to edit.")
+
+    # Function to get the index of a task by its name in the tasks deque
+    def get_task_index_by_name(task_name):
+        for i, task in enumerate(tasks):
+            if task[0] == task_name:
+                return i
+        return -1
+
+    def pin_task():
+        selected_items = task_treeview.selection()
+        if selected_items:
+            for item in selected_items:
+                task_name = task_treeview.item(item, "text")
+                task_index = get_task_index_by_name(task_name)
+
+                if task_index != -1:
+                    task = tasks[task_index]
+                    pin_status = not task[5]  # Toggle the pin status
+
+                    tasks[task_index] = (
+                        task[0],
+                        task[1],
+                        task[2],
+                        task[3],
+                        task[4],
+                        pin_status,
+                        task[6]
+                    )
+
+                    update_task_display()
+                    messagebox.showinfo("Task Pinned",
+                                        f"Task '{task_name}' has been {'pinned' if pin_status else 'unpinned'} successfully.")
+                else:
+                    messagebox.showerror("Invalid Selection", "Please select a valid task.")
+        else:
+            messagebox.showerror("Invalid Selection", "Please select a task to pin/unpin.")
+
+    # Function to toggle the completion status of selected tasks
+    def complete_task():
+        selected_items = task_treeview.selection()
+        if selected_items:
+            for item in selected_items:
+                task_name = task_treeview.item(item, "text")
+                task_index = get_task_index_by_name(task_name)
+
+                if task_index != -1:
+                    task = tasks[task_index]
+                    completion_status = not task[6]  # Toggle the completion status
+
+                    tasks[task_index] = (
+                        task[0],
+                        task[1],
+                        task[2],
+                        task[3],
+                        task[4],
+                        task[5],
+                        completion_status
+                    )
+
+                    update_task_display()
+                    messagebox.showinfo("Task Completed",
+                                        f"Task '{task_name}' has been {'completed' if completion_status else 'incomplete'} successfully.")
+                else:
+                    messagebox.showerror("Invalid Selection", "Please select a valid task.")
+        else:
+            messagebox.showerror("Invalid Selection", "Please select a task to mark as complete/incomplete.")
+
+    # Function to update the task list display
+    def update_task_display():
+        task_treeview.delete(*task_treeview.get_children())
+        for task in tasks:
+            task_name, description, category, due_date, reminder_date = task[:5]
+            pin_status = "Pinned" if task[5] else ""
+            complete_status = "Complete" if task[6] else ""
+            task_treeview.insert("", tk.END, text=task_name,
+                                 values=(description, category, due_date, reminder_date, pin_status, complete_status))
+        task_treeview.bind("<Double-1>", lambda event: edit_task())
+
+    # Function to clear the entry fields and selection
+    def clear_fields_and_selection():
+        entry_search.delete(0, tk.END)  # Clear the search field
+        update_task_display()  # Reset the task list display
+        entry_task_name.delete(0, tk.END)
+        entry_description.delete("1.0", tk.END)
+        entry_category.delete(0, tk.END)
+        calendar_due_date.configure(state="disabled")  # Disable the DateEntry widget
+        calendar_due_date.set_date(None)  # Clear the calendar widget
+        calendar_reminder_date.configure(state="disabled")  # Disable the DateEntry widget
+        calendar_reminder_date.set_date(None)  # Clear the calendar widget
+        due_date_checkbox.set(False)
+        reminder_date_checkbox.set(False)
+        task_treeview.selection_remove(task_treeview.focus())
+
+
     # Create the main window
     window = tk.Tk()
     window.title("Task Manager")
@@ -252,7 +258,7 @@ def create_task_manager():
     window.config(bg="#333333")  # Set a visually appealing background color
 
     heading_label = tk.Label(window, text="Welcome Back to Task Manager", font=("Arial", 30, "bold"), fg="#ffffff", bg="#333333")
-    heading_label.grid(row=0, column=0, columnspan=6,pady=30) 
+    heading_label.grid(row=0, column=0, columnspan=6,pady=30)
     mannage_acc_button = tk.Button(
         window,
         text="Manage Account",
