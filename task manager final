@@ -1,0 +1,412 @@
+import tkinter as tk
+from tkinter import ttk,messagebox,BooleanVar
+from tkcalendar import DateEntry
+from collections import deque
+from script3 import create_manage_account
+import webbrowser
+
+# Initialize the task list
+tasks = deque()
+
+def create_task_manager():
+    # Function to add a new task
+    def add_task():
+        task_name = entry_task_name.get()
+        description = entry_description.get("1.0", tk.END).strip()
+        category = entry_category.get() if entry_category.get() else ""
+        due_date = calendar_due_date.get() if due_date_checkbox.get() else ""
+        reminder_date = calendar_reminder_date.get() if reminder_date_checkbox.get() else ""
+        priority = combo_priority.get()
+
+        if task_name:
+            tasks.append((task_name, description, category, due_date, reminder_date, priority, False))
+            update_task_display()
+            clear_fields_and_selection()
+        else:
+            messagebox.showerror("Invalid Task", "Please enter a task name.")
+
+    # Function to delete a task
+    def delete_task():
+        selected_items = task_treeview.selection()
+        if selected_items:
+            for item in selected_items:
+                task_name = task_treeview.item(item, "text")
+                remove_task_by_name(task_name)
+                task_treeview.delete(item)
+            messagebox.showinfo("Task Deleted", "Task has been deleted successfully.")
+        else:
+            messagebox.showerror("Invalid Selection", "Please select a task to delete.")
+
+    # Function to search for tasks by name
+    def search_tasks():
+        search_text = entry_search.get()
+        if search_text:
+            matching_tasks = [task for task in tasks if search_text.lower() in task[0].lower()]
+            if matching_tasks:
+                display_search_results(matching_tasks)
+            else:
+                messagebox.showinfo("No Matches", "No tasks match the search criteria.")
+        else:
+            messagebox.showwarning("Empty Search", "Please enter a search term.")
+
+    # Function to display the search results
+    def display_search_results(results):
+        task_treeview.delete(*task_treeview.get_children())
+        for task in results:
+            task_name, description, category, due_date, reminder_date, priority, complete_status = task
+            complete_status_text = "Complete" if complete_status else ""
+            priority_text = priority if priority != "Non" else ""  # Get the priority text
+
+            if priority == "Low":
+                priority_tag = "low_priority"
+            elif priority == "Medium":
+                priority_tag = "medium_priority"
+            elif priority == "High":
+                priority_tag = "high_priority"
+            else:
+                priority_tag = ""  # No highlighting for "Non" priority
+
+            task_treeview.insert("", tk.END, text=task_name, values=(
+            description, category, due_date, reminder_date, priority_text, complete_status_text), tags=priority_tag)
+
+    # Function to remove a task by its name from the tasks deque
+    def remove_task_by_name(task_name):
+        index = -1
+        for i, task in enumerate(tasks):
+            if task[0] == task_name:
+                index = i
+                break
+        if index != -1:
+            tasks.remove(tasks[index])
+
+    def edit_task():
+        selected_items = task_treeview.selection()
+        if len(selected_items) == 1:
+            item = selected_items[0]
+            task_name = task_treeview.item(item, "text")
+            task_index = get_task_index_by_name(task_name)
+
+            if task_index != -1:
+                task = tasks[task_index]
+
+                entry_task_name.delete(0, tk.END)
+                entry_task_name.insert(0, task[0])
+
+                entry_description.delete("1.0", tk.END)
+                entry_description.insert(tk.END, task[1])
+
+                entry_category.delete(0, tk.END)
+                entry_category.insert(0, task[2])
+
+                due_date = task[3]
+                reminder_date = task[4]
+                priority = task[5]
+
+                # Reset checkbox values
+                due_date_checkbox.set(False)
+                reminder_date_checkbox.set(False)
+                combo_priority.set(priority) # Set the selected priority in the combo box
+
+                # Set checkbox and calendar values based on task data
+                if due_date:
+                    due_date_checkbox.set(True)
+                    calendar_due_date.configure(state="normal")  # Enable the DateEntry widget
+                    calendar_due_date.set_date(due_date)
+                else:
+                    calendar_due_date.configure(state="disabled")  # Disable the DateEntry widget
+                    calendar_due_date.set_date(None)  # Clear the calendar widget
+
+                if reminder_date:
+                    reminder_date_checkbox.set(True)
+                    calendar_reminder_date.configure(state="normal")  # Enable the DateEntry widget
+                    calendar_reminder_date.set_date(reminder_date)
+                else:
+                    calendar_reminder_date.configure(state="disabled")  # Disable the DateEntry widget
+                    calendar_reminder_date.set_date(None)  # Clear the calendar widget
+
+                def save_task(item):
+                    edited_task_name = entry_task_name.get()
+                    edited_description = entry_description.get("1.0", tk.END).strip()
+                    edited_category = entry_category.get() if entry_category.get() else ""
+                    edited_due_date = calendar_due_date.get() if due_date_checkbox.get() else ""
+                    edited_reminder_date = calendar_reminder_date.get() if reminder_date_checkbox.get() else ""
+                    edited_priority = combo_priority.get()
+                    if edited_task_name:
+                        selected_items = task_treeview.selection()
+                        if len(selected_items) == 1:
+                            task_name = task_treeview.item(item, "text")
+                            task_index = get_task_index_by_name(task_name)
+
+                            if task_index != -1:
+                                tasks[task_index] = (
+                                    edited_task_name,
+                                    edited_description,
+                                    edited_category,
+                                    edited_due_date,
+                                    edited_reminder_date,
+                                    edited_priority,
+                                    tasks[task_index][6]
+                                )
+                                update_task_display()
+                                clear_fields_and_selection()
+                                messagebox.showinfo("Task Updated", "Task has been updated successfully.")
+                                window.focus()  # Remove focus from the Save Task button
+                            else:
+                                messagebox.showerror("Invalid Selection", "Please select a valid task.")
+                        else:
+                            messagebox.showerror("Invalid Selection", "Please select a task to edit.")
+                    else:
+                        messagebox.showerror("Invalid Task", "Please enter a task name.")
+
+                    # Update the priority highlighting and text display in the edited task row
+                    priority_tag = ""
+                    priority_text = ""
+                    if edited_priority == "Low":
+                        priority_tag = "low_priority"
+                        priority_text = "Low"
+                    elif edited_priority == "Medium":
+                        priority_tag = "medium_priority"
+                        priority_text = "Medium"
+                    elif edited_priority == "High":
+                        priority_tag = "high_priority"
+                        priority_text = "High"
+
+                    task_treeview.item(item, values=(
+                        edited_description, edited_category, edited_due_date, edited_reminder_date, priority_text,
+                        tasks[task_index][6]), tags=priority_tag)
+
+                # Call the save_task function directly when clicking the Edit Task button
+                button_edit_task.config(text="Edit Task", command=lambda: save_task(item))
+            else:
+                messagebox.showerror("Invalid Selection", "Please select a valid task.")
+        else:
+            messagebox.showerror("Invalid Selection", "Please select a single task to edit.")
+
+
+
+    # Function to get the index of a task by its name in the tasks deque
+    def get_task_index_by_name(task_name):
+        for i, task in enumerate(tasks):
+            if task[0] == task_name:
+                return i
+        return -1
+
+    # Function to toggle the completion status of selected tasks
+    def complete_task():
+        selected_items = task_treeview.selection()
+        if selected_items:
+            for item in selected_items:
+                task_name = task_treeview.item(item, "text")
+                task_index = get_task_index_by_name(task_name)
+
+                if task_index != -1:
+                    task = tasks[task_index]
+                    completion_status = not task[6]  # Toggle the completion status
+
+                    tasks[task_index] = (
+                        task[0],
+                        task[1],
+                        task[2],
+                        task[3],
+                        task[4],
+                        task[5],
+                        completion_status
+                    )
+
+                    update_task_display()
+                    messagebox.showinfo("Task Completed",
+                                        f"Task '{task_name}' has been {'completed' if completion_status else 'incomplete'} successfully.")
+                else:
+                    messagebox.showerror("Invalid Selection", "Please select a valid task.")
+        else:
+            messagebox.showerror("Invalid Selection", "Please select a task to mark as complete/incomplete.")
+
+    # Function to update the task list display
+    def update_task_display():
+        task_treeview.delete(*task_treeview.get_children())
+        for task in tasks:
+            task_name, description, category, due_date, reminder_date, priority, complete_status = task
+            complete_status_text = "Complete" if complete_status else ""
+
+            # Define the priority highlighting colors
+            if priority == "Low":
+                priority_tag = "low_priority"
+                priority_text = "Low"
+            elif priority == "Medium":
+                priority_tag = "medium_priority"
+                priority_text = "Medium"
+            elif priority == "High":
+                priority_tag = "high_priority"
+                priority_text = "High"
+            else:
+                priority_tag = ""  # No highlighting for "Non" priority
+                priority_text = ""
+
+            task_treeview.insert("", tk.END, text=task_name, values=(
+            description, category, due_date, reminder_date, priority_text, complete_status_text), tags=priority_tag)
+        task_treeview.bind("<Double-1>", lambda event: edit_task())
+
+    # Function to clear the entry fields and selection
+    def clear_fields_and_selection():
+        entry_search.delete(0, tk.END)  # Clear the search field
+        update_task_display()  # Reset the task list display
+        entry_task_name.delete(0, tk.END)
+        entry_description.delete("1.0", tk.END)
+        entry_category.delete(0, tk.END)
+        combo_priority.set('')
+        calendar_due_date.configure(state="disabled")  # Disable the DateEntry widget
+        calendar_due_date.set_date(None)  # Clear the calendar widget
+        calendar_reminder_date.configure(state="disabled")  # Disable the DateEntry widget
+        calendar_reminder_date.set_date(None)  # Clear the calendar widget
+        due_date_checkbox.set(False)
+        reminder_date_checkbox.set(False)
+        task_treeview.selection_remove(task_treeview.focus())
+
+    def open_google_form():
+        url = "https://forms.gle/u7BmAj21Dsx6SPwL7"
+        webbrowser.open_new(url)
+
+
+    # Create the main window
+    window = tk.Tk()
+    window.title("Task Manager")
+    window.geometry("1200x700")
+    window.resizable(False, False)
+    window.config(bg="#333333")  # Set a visually appealing background color
+
+    feedback_button = tk.Button(
+    window,
+    text="Feedback",
+    font=("Arial", 14),
+    fg="#ffffff",
+    bg="#333333",
+    command=open_google_form
+    )
+    feedback_button.grid(row=0, column=0, padx=10, sticky="w")
+
+    heading_label = tk.Label(window, text="Welcome Back to Task Manager", font=("Arial", 30, "bold"), fg="#ffffff", bg="#333333")
+    heading_label.grid(row=0, column=0, columnspan=6,pady=30)
+    mannage_acc_button = tk.Button(
+        window,
+        text="Manage Account",
+        font=("Arial", 14),
+        fg="#ffffff",
+        bg="#333333",
+        command=create_manage_account
+    )
+    mannage_acc_button.grid(row=0, column=5,sticky="e")
+
+    # Create and position the entry fields
+    label_task_name = tk.Label(window, text="Task Name:",font=("Arial", 12), fg="#ffffff", bg="#333333")
+    label_task_name.grid(row=1, column=0,padx=10,pady=10, sticky="w")
+    entry_task_name = tk.Entry(window, width=20,font=("Arial", 12), bg="#ffffff")
+    entry_task_name.grid(row=1, column=0,padx=100 )
+
+    label_due_date = tk.Label(window, text="Due Date:",font=("Arial", 12), fg="#ffffff", bg="#333333")
+    label_due_date.grid(row=1, column=1,sticky="w")
+    calendar_due_date = DateEntry(window,date_pattern="yyyy-mm-dd",font=("Arial", 14), bg="#ffffff")
+    calendar_due_date.configure(state="disabled")
+    calendar_due_date.grid(row=1, column=2,sticky="w")
+    due_date_checkbox = tk.BooleanVar()
+    checkbox_due_date = tk.Checkbutton(
+        window,
+        font=("Arial", 12), fg="#333333",
+        variable=due_date_checkbox,
+        command=lambda: calendar_due_date.configure(state="normal" if due_date_checkbox.get() else "disabled")
+    )
+    checkbox_due_date.grid(row=1,column=3,sticky="w")
+
+    label_category = tk.Label(window, text="Category:",font=("Arial", 12), fg="#ffffff", bg="#333333")
+    label_category.grid(row=3, column=0, padx=10,pady=10, sticky="w")
+    entry_category = tk.Entry(window, width=20,font=("Arial", 12), bg="#ffffff")
+    entry_category.grid(row=3, column=0, )
+
+    label_reminder_date = tk.Label(window, text="Reminder Date:",font=("Arial", 12), fg="#ffffff", bg="#333333")
+    label_reminder_date.grid(row=2, column=1,)
+    calendar_reminder_date = DateEntry(window, date_pattern="yyyy-mm-dd",font=("Arial", 14), bg="#ffffff")
+    calendar_reminder_date.configure(state="disabled")
+    calendar_reminder_date.grid(row=2, column=2,sticky="w" )
+    reminder_date_checkbox = tk.BooleanVar()
+    checkbox_reminder_date = tk.Checkbutton(
+        window,
+        font=("Arial", 12), fg="#333333",
+        variable=reminder_date_checkbox,
+        command=lambda: calendar_reminder_date.configure(state="normal" if reminder_date_checkbox.get() else "disabled")
+    )
+    checkbox_reminder_date.grid(row=2, column=3, sticky="w")
+
+    label_description = tk.Label(window, text="Description:",font=("Arial", 12), fg="#ffffff", bg="#333333")
+    label_description.grid(row=2, column=0,padx=10,pady=15,  sticky="w")
+    entry_description = tk.Text(window, height=4, width=20,font=("Arial", 12), bg="#ffffff")
+    entry_description.grid(row=2, column=0,)
+
+    # Create and position the buttons
+    button_add_task = tk.Button(window, text="Add Task",font=("Arial", 12), fg="#333333", bg="#ffffff", command=add_task)
+    button_add_task.grid(row=4, column=3,sticky="w")
+
+    button_delete_task = tk.Button(window, text="Delete Task", font=("Arial", 12), fg="#333333", bg="#ffffff",command=delete_task)
+    button_delete_task.grid(row=2, column=5)
+
+    button_edit_task = tk.Button(window, text="Edit Task",font=("Arial", 12), fg="#333333", bg="#ffffff", command=edit_task)
+    button_edit_task.grid(row=1, column=5)
+
+    button_clear = tk.Button(window, text="Clear", font=("Arial", 12), fg="#333333", bg="#ffffff",command=clear_fields_and_selection)
+    button_clear.grid(row=3, column=5)
+
+    button_complete_task = tk.Button(window, text="Complete", font=("Arial", 12), fg="#333333", bg="#ffffff",command=complete_task)
+    button_complete_task.grid(row=4, column=5)
+
+    # Create and position the search field and button
+    label_search = tk.Label(window, text="Search:",font=("Arial", 12), fg="#ffffff", bg="#333333")
+    label_search.grid(row=4, column=0, padx=10,pady=30, sticky="w")
+    entry_search = tk.Entry(window,width=31,font=("Arial", 12), bg="#ffffff")
+    entry_search.grid(row=4, column=0,sticky="e")
+    button_search = tk.Button(window, text="Search",font=("Arial", 12), fg="#333333", bg="#ffffff", command=search_tasks)
+    button_search.grid(row=4, column=1,)
+
+    # Create a combobox for selecting priority
+    label_priority = tk.Label(window, text="Priority:", font=("Arial", 12), fg="#ffffff", bg="#333333")
+    label_priority.grid(row=3, column=1, sticky="w")
+    combo_priority = ttk.Combobox(window, values=["Non", "Low", "Medium", "High"], state="readonly")
+    combo_priority.grid(row=3, column=2, sticky="w")
+
+    # Create and position the task treeview
+    task_treeview = ttk.Treeview(window, columns=("Description", "Category", "Due Date", "Reminder Date", "Priority", "Complete"))
+    task_treeview.heading("#0", text="Task Name")
+    task_treeview.heading("Description", text="Description")
+    task_treeview.heading("Category", text="Category")
+    task_treeview.heading("Due Date", text="Due Date")
+    task_treeview.heading("Reminder Date", text="Reminder Date")
+    task_treeview.heading("Priority", text="Priority")
+    task_treeview.heading("Complete", text="Complete")
+
+    task_treeview.column("#0", width=200, anchor="w")
+    task_treeview.column("Description", width=200, anchor="w")
+    task_treeview.column("Category", width=100, anchor="w")
+    task_treeview.column("Due Date", width=100, anchor="w")
+    task_treeview.column("Reminder Date", width=100, anchor="w")
+    task_treeview.column("Priority", width=70, anchor="w")
+    task_treeview.column("Complete", width=70, anchor="w")
+
+    task_treeview.grid(row=5, column=0, columnspan=6, sticky="nswe")
+
+    # Configure priority highlighting tags and colors
+    task_treeview.tag_configure("low_priority", background="green")
+    task_treeview.tag_configure("medium_priority", background="yellow")
+    task_treeview.tag_configure("high_priority", background="red")
+
+    # Configure the treeview font style
+    style = ttk.Style()
+    style.configure("Treeview", font=("Arial", 12))  # Set the desired font style for the Treeview widget
+
+    # Add scrollbar to the task treeview
+    scrollbar = ttk.Scrollbar(window, orient="vertical", command=task_treeview.yview)
+    scrollbar.grid(row=5, column=6,sticky="ns")
+    task_treeview.configure(yscroll=scrollbar.set)
+
+    # Configure the grid layout
+    window.grid_rowconfigure(5, weight=1)
+    window.grid_columnconfigure(2, weight=1)
+
+    # Run the main window loop
+    window.mainloop()
