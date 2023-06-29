@@ -1,10 +1,10 @@
 import tkinter as tk
-from tkinter import ttk,messagebox
+from tkinter import ttk,messagebox,BooleanVar
 from tkcalendar import DateEntry
 from collections import deque
 from script3 import create_manage_account
 import webbrowser
-import datetime
+from datetime import datetime, timedelta
 import sqlite3
 # Connect to the database
 conn = sqlite3.connect("user.db")
@@ -293,6 +293,20 @@ def create_task_manager(user_id):
         url = "https://forms.gle/u7BmAj21Dsx6SPwL7"
         webbrowser.open_new(url)
 
+    # Function to check for task reminders
+    def check_reminders():
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
+        c.execute(
+            "SELECT task_id, task_name, description, category_name, due_date, reminder_date, status FROM TASK WHERE user_id = ?",
+            (user_id,))
+        tasks_data = c.fetchall()
+        for task in tasks_data:
+            reminder_date = task[5]
+            if reminder_date and reminder_date <= current_time:
+                task_name = task[1]
+                messagebox.showinfo("Task Reminder", f"Reminder for task: {task_name}")
+
+        window.after(1000, check_reminders)
 
     # Create the main window
     window = tk.Tk()
@@ -324,7 +338,7 @@ def create_task_manager(user_id):
     mannage_acc_button.grid(row=0, column=5,sticky="e")
 
     # Create and position the entry fields
-    label_task_name = tk.Label(window, text="Task Name:",font=("Arial", 12), fg="#ffffff", bg="#333333")
+    label_task_name = tk.Label(window, text="Name:",font=("Arial", 12), fg="#ffffff", bg="#333333")
     label_task_name.grid(row=1, column=0,padx=10,pady=10, sticky="w")
     entry_task_name = tk.Entry(window, width=20,font=("Arial", 12), bg="#ffffff")
     entry_task_name.grid(row=1, column=0,padx=100 )
@@ -362,25 +376,25 @@ def create_task_manager(user_id):
     )
     checkbox_reminder_date.grid(row=2, column=3, sticky="w")
 
-    label_description = tk.Label(window, text="Description:",font=("Arial", 12), fg="#ffffff", bg="#333333")
+    label_description = tk.Label(window, text="Notes:",font=("Arial", 12), fg="#ffffff", bg="#333333")
     label_description.grid(row=2, column=0,padx=10,pady=15,  sticky="w")
     entry_description = tk.Text(window, height=4, width=20,font=("Arial", 12), bg="#ffffff")
     entry_description.grid(row=2, column=0,)
 
     # Create and position the buttons
-    button_add_task = tk.Button(window, text="Add Task",font=("Arial", 12), fg="#333333", bg="#ffffff", command=add_task)
+    button_add_task = tk.Button(window, text="Add Task",font=("Arial", 12),width=10, fg="#333333", bg="#ffffff", command=add_task)
     button_add_task.grid(row=4, column=3,sticky="w")
 
-    button_delete_task = tk.Button(window, text="Delete Task", font=("Arial", 12), fg="#333333", bg="#ffffff",command=delete_task)
+    button_delete_task = tk.Button(window, text="Delete Task", font=("Arial", 12),width=10, fg="#333333", bg="#ffffff",command=delete_task)
     button_delete_task.grid(row=2, column=5)
 
-    button_edit_task = tk.Button(window, text="Edit Task",font=("Arial", 12), fg="#333333", bg="#ffffff", command=edit_task)
+    button_edit_task = tk.Button(window, text="Edit Task",font=("Arial", 12), width=10,fg="#333333", bg="#ffffff", command=edit_task)
     button_edit_task.grid(row=1, column=5)
 
-    button_clear = tk.Button(window, text="Clear", font=("Arial", 12), fg="#333333", bg="#ffffff",command=clear_fields_and_selection)
+    button_clear = tk.Button(window, text="Clear", font=("Arial", 12),width=10, fg="#333333", bg="#ffffff",command=clear_fields_and_selection)
     button_clear.grid(row=3, column=5)
 
-    button_complete_task = tk.Button(window, text="Complete", font=("Arial", 12), fg="#333333", bg="#ffffff",command=complete_task)
+    button_complete_task = tk.Button(window, text="Complete", font=("Arial", 12),width=10, fg="#333333", bg="#ffffff",command=complete_task)
     button_complete_task.grid(row=4, column=5)
 
     # Create and position the search field and button
@@ -388,7 +402,7 @@ def create_task_manager(user_id):
     label_search.grid(row=4, column=0, padx=10,pady=30, sticky="w")
     entry_search = tk.Entry(window,width=31,font=("Arial", 12), bg="#ffffff")
     entry_search.grid(row=4, column=0,sticky="e")
-    button_search = tk.Button(window, text="Search",font=("Arial", 12), fg="#333333", bg="#ffffff", command=search_tasks)
+    button_search = tk.Button(window, text="Search",font=("Arial", 12), width=10,fg="#333333", bg="#ffffff", command=search_tasks)
     button_search.grid(row=4, column=1,)
 
     # Create a combobox for selecting priority
@@ -398,7 +412,7 @@ def create_task_manager(user_id):
     combo_priority.grid(row=3, column=2, sticky="w")
 
     # Create and position the task treeview
-    task_treeview = ttk.Treeview(window, columns=("Task Name","Description", "Category", "Due Date", "Reminder Date", "Priority", "Complete"),
+    task_treeview = ttk.Treeview(window, columns=("Task Name", "Description", "Category", "Due Date", "Reminder Date", "Priority", "Complete"),
                                  show='headings')
     task_treeview.heading("#0", text="Task ID")
     task_treeview.heading("Task Name", text="Task Name")
@@ -410,7 +424,7 @@ def create_task_manager(user_id):
     task_treeview.heading("Complete", text="Complete")
 
     task_treeview.column("#0", width=10, anchor="w")
-    task_treeview.column("Task Name", width=200, anchor='w')
+    task_treeview.heading("Task Name", width=200, anchor="w")
     task_treeview.column("Description", width=200, anchor="w")
     task_treeview.column("Category", width=100, anchor="w")
     task_treeview.column("Due Date", width=100, anchor="w")
@@ -436,9 +450,13 @@ def create_task_manager(user_id):
 
     # Configure the grid layout
     window.grid_rowconfigure(5, weight=1)
-    window.grid_columnconfigure(2, weight=1)
+    window.grid_columnconfigure(5, weight=1)
+
+    # Run the main window loop
+    window.after(1000, check_reminders)  # Check for reminders every second (adjust the time interval as needed)
 
     refresh_task_list()
+    conn.close
 
     # Run the main window loop
     window.mainloop()
