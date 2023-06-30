@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import messagebox, simpledialog
 import sqlite3
 import re
+from PIL import Image, ImageTk
 from script2 import create_task_manager
 
 class LoginPage(tk.Frame):
@@ -19,10 +20,21 @@ class LoginPage(tk.Frame):
 
         # Set window background color
         self.master.config(bg="#333333")
+        # Load the image
+        image_path = 'i.jpg'  # Replace with the actual image file path
+        image = Image.open(image_path)
+        image = image.resize((150, 150))
+
+        # Create a PhotoImage object
+        self.photo = ImageTk.PhotoImage(image)
 
         # Create header label
-        header_label = tk.Label(self.master, text="Welcome Back!", font=("Arial", 40), fg="#ffffff", bg="#333333")
-        header_label.pack(pady=100)
+        header_label = tk.Label(self.master, text="Welcome Back To", font=("Arial", 40), fg="#ffffff", bg="#333333")
+        header_label.pack(pady=20)
+
+        # Create an image label
+        image_label = tk.Label(self.master, image=self.photo)
+        image_label.pack(pady=30)
 
         # Create form frame
         form_frame = tk.Frame(self.master, bg="#333333")
