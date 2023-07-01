@@ -1,15 +1,15 @@
 import tkinter as tk
-from tkinter import ttk,messagebox,BooleanVar
+from tkinter import ttk,messagebox,OptionMenu
 from tkcalendar import DateEntry
 from collections import deque
 from script3 import create_manage_account
 import webbrowser
-from datetime import datetime, timedelta
+import datetime
 import sqlite3
 # Connect to the database
 conn = sqlite3.connect("user.db")
 c = conn.cursor()
-c.execute("SELECT task_id, task_name, description, category_name, due_date,reminder_date, status FROM TASK")
+c.execute("SELECT task_id, task_name, description, due_date,reminder_date, status FROM TASK")
 tasks_data = c.fetchall()
 
 # Initialize the task list
@@ -17,10 +17,18 @@ tasks = deque(task for task in tasks_data)
 def create_task_manager(user_id):
     def refresh_task_list():
         task_treeview.delete(*task_treeview.get_children())
+
         # Fetch the data for the specific user
-        query = "SELECT task_id, task_name, description, category_name, due_date, reminder_date, priority, status FROM TASK WHERE User_id=?"
+        query = """
+            SELECT TASK.task_id, TASK.task_name, TASK.description, CATEGORY.category_name,
+                   TASK.due_date, TASK.reminder_date, TASK.priority, TASK.status
+            FROM TASK
+            LEFT JOIN CATEGORY ON TASK.category_id = CATEGORY.category_id
+            WHERE TASK.user_id = ?
+        """
         c.execute(query, (user_id,))
         results = c.fetchall()
+
         # Display the data in the task_treeview widget
         for row in results:
             task_id, task_name, description, category_name, due_date, reminder_date, priority, status = row
@@ -51,7 +59,7 @@ def create_task_manager(user_id):
     def add_task():
         task_name = entry_task_name.get()
         description = entry_description.get("1.0", tk.END).strip()
-        category = entry_category.get() if entry_category.get() else ""
+        category = entry_category.get().strip()
         due_date = calendar_due_date.get() if due_date_checkbox.get() else ""
         reminder_date = calendar_reminder_date.get() if reminder_date_checkbox.get() else ""
         priority = combo_priority.get()
@@ -60,15 +68,45 @@ def create_task_manager(user_id):
         if task_name:
             user_id = get_user_id()
             if user_id is not None:
+                if category:
+                    # Check if the category already exists for the user
+                    c.execute("SELECT CATEGORY_ID FROM CATEGORY WHERE CATEGORY_NAME=? AND USER_ID=?",
+                              (category, user_id))
+                    result = c.fetchone()
+                    if result:
+                        # If the category exists, use the existing category ID
+                        category_id = result[0]
+                    else:
+                        # If the category doesn't exist, insert it into the CATEGORY table
+                        c.execute("INSERT INTO CATEGORY (CATEGORY_NAME, USER_ID) VALUES (?, ?)", (category, user_id))
+                        conn.commit()
+
+                        # Get the newly inserted category ID
+                        category_id = c.lastrowid
+
+                else:
+                    # If no category provided, set the category ID to None
+                    category_id = None
+
                 # Insert into TASK table
                 c.execute(
-                    "INSERT INTO TASK (TASK_NAME, DESCRIPTION, CREATED_DATE, DUE_DATE,  CATEGORY_NAME, REMINDER_DATE, PRIORITY, STATUS, USER_ID) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (task_name, description, created_date, due_date, category, reminder_date, priority, 'Incomplete',
+                    "INSERT INTO TASK (TASK_NAME, DESCRIPTION, CREATED_DATE, DUE_DATE, CATEGORY_ID, REMINDER_DATE, PRIORITY, STATUS, USER_ID) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (task_name, description, created_date, due_date, category_id, reminder_date, priority, 'Incomplete',
                      user_id))
                 conn.commit()
-                tasks.append((task_name, description, created_date, due_date, category, reminder_date, priority, False))
+
+                # Get the task ID of the newly inserted task
+                task_id = c.lastrowid
+
+                # Append the new task to the tasks list
+                new_task = (task_id, task_name, description, category, due_date, reminder_date, priority, 'Incomplete')
+                tasks.append(new_task)
+
                 clear_fields_and_selection()
                 refresh_task_list()
+
+                # Show success message
+                messagebox.showinfo("Task Added", "Task has been successfully added.")
             else:
                 messagebox.showerror("Error", "User not found.")
         else:
@@ -106,7 +144,7 @@ def create_task_manager(user_id):
             user_id = get_user_id()  # Replace with the actual user ID
 
             # Perform a database query to search for tasks of the specific user matching the search criteria
-            c.execute("SELECT task_name, description, category_name, due_date, reminder_date,priority,status FROM TASK WHERE USER_ID = ? AND lower(TASK_NAME) LIKE ?",
+            c.execute("SELECT TASK.task_name, TASK.description, CATEGORY.category_name, TASK.due_date, TASK.reminder_date, TASK.priority, TASK.status FROM TASK JOIN CATEGORY ON TASK.category_id = CATEGORY.category_id WHERE TASK.user_id = ? AND lower(TASK.task_name) LIKE ?",
                       (user_id, '%' + search_text.lower() + '%',))
             matching_tasks = c.fetchall()
 
@@ -141,54 +179,42 @@ def create_task_manager(user_id):
         if len(selected_items) == 1:
             item = selected_items[0]
             task_id = task_treeview.item(item, "text")
-            task_index = get_task_index_by_id(task_id)
 
-            if task_index != -1:
-                task = tasks[task_index]
+            # Fetch the data for the selected task
+            query = """
+                SELECT TASK.task_id, TASK.task_name, TASK.description, CATEGORY.category_id, CATEGORY.category_name,
+                       TASK.due_date, TASK.reminder_date, TASK.priority, TASK.status
+                FROM TASK
+                INNER JOIN CATEGORY ON TASK.category_id = CATEGORY.category_id
+                WHERE TASK.task_id = ? AND TASK.user_id = ?
+            """
+            c.execute(query, (task_id, user_id))
+            result = c.fetchone()
+
+            if result:
+                task_id, task_name, description, category_id, category_name, due_date, reminder_date, priority, status = result
 
                 entry_task_name.delete(0, tk.END)
-                entry_task_name.insert(0, task[1])
+                entry_task_name.insert(0, task_name)
 
                 entry_description.delete("1.0", tk.END)
-                entry_description.insert(tk.END, task[2])
+                entry_description.insert(tk.END, description)
 
                 entry_category.delete(0, tk.END)
-                entry_category.insert(0, task[3])
+                entry_category.insert(0, category_name)
 
-                due_date = task[4]
-                reminder_date = task[5]
-                priority = task[6]
+                due_date_checkbox.set(bool(due_date))
+                reminder_date_checkbox.set(bool(reminder_date))
+                combo_priority.set(priority)
 
-                # Reset checkbox values
-                due_date_checkbox.set(False)
-                reminder_date_checkbox.set(False)
-                combo_priority.set(priority)  # Set the selected priority in the combo box
-
-                # Set checkbox and calendar values based on task data
-                if due_date:
-                    due_date_checkbox.set(True)
-                    calendar_due_date.configure(state="normal")  # Enable the DateEntry widget
-                    calendar_due_date.set_date(due_date)
-                else:
-                    calendar_due_date.configure(state="disabled")  # Disable the DateEntry widget
-                    calendar_due_date.set_date(None)  # Clear the calendar widget
-
-                if reminder_date:
-                    reminder_date_checkbox.set(True)
-                    calendar_reminder_date.configure(state="normal")  # Enable the DateEntry widget
-                    calendar_reminder_date.set_date(reminder_date)
-                else:
-                    calendar_reminder_date.configure(state="disabled")  # Disable the DateEntry widget
-                    calendar_reminder_date.set_date(None)  # Clear the calendar widget
-
-                # Call the save_task function directly when clicking the Edit Task button
-                button_edit_task.config(text="Save", command=save_task)
+                # Update the Save button command to call save_task() with task_id and category_id
+                button_edit_task.config(text="Save", command=lambda: save_task(task_id, category_id))
             else:
                 messagebox.showerror("Invalid Selection", "Please select a valid task.")
         else:
             messagebox.showerror("Invalid Selection", "Please select a single task to edit.")
 
-    def save_task():
+    def save_task(task_id, category_id):
         edited_task_name = entry_task_name.get()
         edited_description = entry_description.get("1.0", tk.END).strip()
         edited_category = entry_category.get() if entry_category.get() else ""
@@ -204,21 +230,36 @@ def create_task_manager(user_id):
                 task_index = get_task_index_by_id(task_id)
 
                 if task_index != -1:
+                    # Check if the entered category name exists for the specific user
+                    c.execute("SELECT category_id FROM CATEGORY WHERE category_name = ? AND user_id = ?",
+                              (edited_category, user_id))
+                    result = c.fetchone()
+
+                    if result:
+                        category_id = result[0]
+                    else:
+                        # Create a new category for the user
+                        c.execute("INSERT INTO CATEGORY (category_name, user_id) VALUES (?, ?)",
+                                  (edited_category, user_id))
+                        conn.commit()
+                        category_id = c.lastrowid
+
                     tasks[task_index] = (
                         task_id,
                         edited_task_name,
                         edited_description,
-                        edited_category,
+                        category_id,
                         edited_due_date,
                         edited_reminder_date,
                         edited_priority,
-                        tasks[task_index][6]
+                        tasks[task_index][7] if len(tasks[task_index]) > 7 else ""
+                    # Updated index to account for category_id
                     )
 
-                    # Update the TASK table in the database
+                    # Update the TASK table in the database with the updated category_id
                     c.execute(
-                        "UPDATE TASK SET TASK_NAME = ?, DESCRIPTION = ?, CATEGORY_NAME = ?, DUE_DATE = ?, REMINDER_DATE = ?,PRIORITY=? WHERE TASK_ID = ?",
-                        (edited_task_name, edited_description, edited_category, edited_due_date,
+                        "UPDATE TASK SET TASK_NAME = ?, DESCRIPTION = ?, CATEGORY_ID = ?, DUE_DATE = ?, REMINDER_DATE = ?, PRIORITY = ? WHERE TASK_ID = ?",
+                        (edited_task_name, edited_description, category_id, edited_due_date,
                          edited_reminder_date, edited_priority,
                          task_treeview.item(item, "text"))
                     )
@@ -234,7 +275,6 @@ def create_task_manager(user_id):
                 messagebox.showerror("Invalid Item", "Selected item does not exist in the task list.")
         else:
             messagebox.showerror("Invalid Task", "Please enter a task name.")
-
     # Function to get the index of a task by its id in the tasks deque
     def get_task_index_by_id(task_id):
         for i, task in enumerate(tasks):
@@ -252,26 +292,54 @@ def create_task_manager(user_id):
 
                 if task_index != -1:
                     task = tasks[task_index]
-                    completion_status = 'Complete' if task[6] == 'Incomplete' else 'Incomplete'
 
-                    tasks[task_index] = (
-                        task_id,
-                        task[1],
-                        task[2],
-                        task[3],
-                        task[4],
-                        task[5],
-                        completion_status
-                    )
+                    c.execute("SELECT status FROM TASK WHERE task_id = ?", (task_id,))
+                    result = c.fetchone()
 
-                    c.execute("UPDATE TASK SET STATUS = ? WHERE TASK_ID = ?", (completion_status, task_id))
-                    conn.commit()
-                    refresh_task_list()
-                    messagebox.showinfo("Task Status Updated",f"Task '{task_id}' has been marked as {completion_status}.")
+                    if result:
+                        current_status = result[0]
+                        completion_status = 'Complete' if current_status == 'Incomplete' else 'Incomplete'
+
+                        c.execute("UPDATE TASK SET STATUS = ? WHERE TASK_ID = ?", (completion_status, task_id))
+                        conn.commit()
+
+                        tasks[task_index] = (
+                            task[0],
+                            task[1],
+                            task[2],
+                            task[3],
+                            task[4],
+                            task[5],
+                            completion_status
+                        )
+
+                        refresh_task_list()
+                        messagebox.showinfo("Task Status Updated",
+                                            f"Task '{task_id}' has been marked as {completion_status}.")
+                    else:
+                        messagebox.showerror("Invalid Selection", "Please select a valid task.")
                 else:
                     messagebox.showerror("Invalid Selection", "Please select a valid task.")
         else:
             messagebox.showerror("Invalid Selection", "Please select a task to mark as complete/incomplete.")
+
+    def check_reminders():
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        query = """
+            SELECT T.task_id, T.task_name, T.description, C.category_name, T.due_date, T.reminder_date, T.status
+            FROM TASK AS T
+            INNER JOIN CATEGORY AS C ON T.category_id = C.category_id
+            WHERE T.user_id = ?
+        """
+        c.execute(query, (user_id,))
+        tasks_data = c.fetchall()
+        for task in tasks_data:
+            reminder_date = task[5]
+            if reminder_date and reminder_date <= current_time:
+                task_name = task[1]
+                messagebox.showinfo("Task Reminder", f"Reminder for task: {task_name}")
+
+        window.after(1000 * 60 * 30, check_reminders)
 
     # Function to clear the entry fields and selection
     def clear_fields_and_selection():
@@ -287,26 +355,20 @@ def create_task_manager(user_id):
         calendar_reminder_date.set_date(None)  # Clear the calendar widget
         due_date_checkbox.set(False)
         reminder_date_checkbox.set(False)
+        button_edit_task.config(text="Edit", command=edit_task)
         task_treeview.selection_remove(task_treeview.focus())
+
+    def get_category_names():
+        query = "SELECT category_name FROM CATEGORY WHERE user_id = ?"
+        c.execute(query, (user_id,))
+        categories = c.fetchall()
+        category_names = [category[0] for category in categories]
+        return category_names
 
     def open_google_form():
         url = "https://forms.gle/u7BmAj21Dsx6SPwL7"
         webbrowser.open_new(url)
 
-    # Function to check for task reminders
-    def check_reminders():
-        current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
-        c.execute(
-            "SELECT task_id, task_name, description, category_name, due_date, reminder_date, status FROM TASK WHERE user_id = ?",
-            (user_id,))
-        tasks_data = c.fetchall()
-        for task in tasks_data:
-            reminder_date = task[5]
-            if reminder_date and reminder_date <= current_time:
-                task_name = task[1]
-                messagebox.showinfo("Task Reminder", f"Reminder for task: {task_name}")
-
-        window.after(1000, check_reminders)
 
     # Create the main window
     window = tk.Tk()
@@ -411,8 +473,9 @@ def create_task_manager(user_id):
     combo_priority = ttk.Combobox(window, values=["Non", "Low", "Medium", "High"], state="readonly")
     combo_priority.grid(row=3, column=2, sticky="w")
 
+
     # Create and position the task treeview
-    task_treeview = ttk.Treeview(window, columns=("Task Name", "Description", "Category", "Due Date", "Reminder Date", "Priority", "Complete"),
+    task_treeview = ttk.Treeview(window, columns=("Task Name","Description", "Category", "Due Date", "Reminder Date", "Priority", "Complete"),
                                  show='headings')
     task_treeview.heading("#0", text="Task ID")
     task_treeview.heading("Task Name", text="Task Name")
@@ -424,7 +487,7 @@ def create_task_manager(user_id):
     task_treeview.heading("Complete", text="Complete")
 
     task_treeview.column("#0", width=10, anchor="w")
-    task_treeview.heading("Task Name", width=200, anchor="w")
+    task_treeview.column("Task Name", width=200, anchor='w')
     task_treeview.column("Description", width=200, anchor="w")
     task_treeview.column("Category", width=100, anchor="w")
     task_treeview.column("Due Date", width=100, anchor="w")
@@ -452,11 +515,7 @@ def create_task_manager(user_id):
     window.grid_rowconfigure(5, weight=1)
     window.grid_columnconfigure(5, weight=1)
 
-    # Run the main window loop
-    window.after(1000, check_reminders)  # Check for reminders every second (adjust the time interval as needed)
-
     refresh_task_list()
-    conn.close
-
+    check_reminders()
     # Run the main window loop
     window.mainloop()
