@@ -180,12 +180,12 @@ def create_task_manager(user_id):
             item = selected_items[0]
             task_id = task_treeview.item(item, "text")
 
-            # Fetch the data for the selected task
+            # Fetch the data for the selected task with a LEFT JOIN
             query = """
                 SELECT TASK.task_id, TASK.task_name, TASK.description, CATEGORY.category_id, CATEGORY.category_name,
                        TASK.due_date, TASK.reminder_date, TASK.priority, TASK.status
                 FROM TASK
-                INNER JOIN CATEGORY ON TASK.category_id = CATEGORY.category_id
+                LEFT JOIN CATEGORY ON TASK.category_id = CATEGORY.category_id AND TASK.user_id = CATEGORY.user_id
                 WHERE TASK.task_id = ? AND TASK.user_id = ?
             """
             c.execute(query, (task_id, user_id))
@@ -200,8 +200,11 @@ def create_task_manager(user_id):
                 entry_description.delete("1.0", tk.END)
                 entry_description.insert(tk.END, description)
 
-                entry_category.delete(0, tk.END)
-                entry_category.insert(0, category_name)
+                if category_name:
+                    entry_category.delete(0, tk.END)
+                    entry_category.insert(0, category_name)
+                else:
+                    entry_category.delete(0, tk.END)
 
                 due_date_checkbox.set(bool(due_date))
                 reminder_date_checkbox.set(bool(reminder_date))
