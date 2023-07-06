@@ -99,13 +99,52 @@ class ManageAccountPage(tk.Frame):
         )
         save_button.pack(pady=30)
 
+        # Retrieve and display the existing data
+        self.retrieve_existing_data()
+
+    def retrieve_existing_data(self):
+        # Retrieve the username from the entry field
+        username = self.username_entry.get()
+
+        # Connect to the database
+        conn = sqlite3.connect('user.db')
+        cursor = conn.cursor()
+
+        # Retrieve the user's information based on the username
+        query = "SELECT * FROM User WHERE Username=?"
+        cursor.execute(query, (username,))
+        user = cursor.fetchone()
+
+        if user:
+            # Extract the user information from the result
+            first_name = user[3]
+            last_name = user[4]
+            email = user[2]
+            password = user[5]
+
+            # Set the retrieved values in the entry fields
+            self.first_name_entry.delete(0, tk.END)
+            self.first_name_entry.insert(0, first_name)
+            self.last_name_entry.delete(0, tk.END)
+            self.last_name_entry.insert(0, last_name)
+            self.email_entry.delete(0, tk.END)
+            self.email_entry.insert(0, email)
+            self.password_entry.delete(0, tk.END)
+            self.password_entry.insert(0, password)
+            self.password_confirm_entry.delete(0, tk.END)
+            self.password_confirm_entry.insert(0, password)
+
+        # Close the cursor and connection
+        cursor.close()
+        conn.close()
+
     def save_changes(self):
         # Retrieve the entered values
         first_name = self.first_name_entry.get()
         last_name = self.last_name_entry.get()
         email = self.email_entry.get()
         password = self.password_entry.get()
-        username=self.username_entry.get()
+        username = self.username_entry.get()
 
         # Connect to the database
         conn = sqlite3.connect('user.db')
@@ -113,7 +152,7 @@ class ManageAccountPage(tk.Frame):
 
         # Get the user_id from the database
         query = "SELECT UserID FROM User WHERE Username=?"
-        cursor.execute(query,(username,))
+        cursor.execute(query, (username,))
         user = cursor.fetchone()
         if user:
             user_id = user[0]  # Extract the user_id from the result
@@ -137,23 +176,9 @@ class ManageAccountPage(tk.Frame):
             # Show error message
             messagebox.showerror("Error", "User not found.")
 
-        # Add any additional logic or display a success message if needed
-
-        # Create back label
-        back_label = tk.Button(
-            self.master,
-            text="Back to Task Manager",
-            font=("Arial", 16),
-            fg="#ffffff",
-            bg="#333333",
-            cursor="hand2",
-            command=self.back_to_task_manager  # Add cursor style for hover effect
-        )
-        back_label.pack(side="top", pady=10)
-        back_label.bind("<Button-1>", self.back_to_task_manager)  # Bind the label to the method
-
     def back_to_task_manager(self, event):
         self.master.destroy()
+
 
 def create_manage_account():
     # Create the main tkinter window
@@ -163,15 +188,15 @@ def create_manage_account():
     manage_account_page = ManageAccountPage(root)
 
     # Create back label
-    back_label = tk.Label(
+    back_label = tk.Button(
         root,
         text="Back to Task Manager",
-        font=("Arial", 16),
+        font=("Arial", 14),
         fg="#ffffff",
         bg="#333333",
-        cursor="hand2"  # Add cursor style for hover effect
+
     )
-    back_label.pack(side="top", pady=10)
+    back_label.pack(padx=10,anchor="n")
     back_label.bind("<Button-1>", manage_account_page.back_to_task_manager)  # Bind the label to the method
 
     # Run the tkinter event loop
