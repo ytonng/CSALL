@@ -95,10 +95,18 @@ class LoginPage(tk.Frame):
     def execute_query(self, query, *params):
         conn = sqlite3.connect('user.db')
         cursor = conn.cursor()
-        cursor.execute(query, params)
-        result = cursor.fetchone()
+
+        if query.lower().startswith('select'):
+            cursor.execute(query, params)
+            result = cursor.fetchone()
+        else:
+            cursor.execute(query, params)
+            result = None
+
+        conn.commit()
         cursor.close()
         conn.close()
+
         return result
 
     def login(self):
@@ -139,8 +147,6 @@ class LoginPage(tk.Frame):
                 messagebox.showerror("Error", "Email not found.")
         else:
             messagebox.showerror("Error", "Email not found.")
-
-
 
     def open_signup_page(self):
             # Destroy the current window
