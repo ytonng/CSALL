@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import messagebox, simpledialog
 import sqlite3
 import re
+from PIL import Image, ImageTk
 from script2 import create_task_manager
 
 class LoginPage(tk.Frame):
@@ -19,10 +20,21 @@ class LoginPage(tk.Frame):
 
         # Set window background color
         self.master.config(bg="#333333")
+        # Load the image
+        image_path = 'i.jpg'  # Replace with the actual image file path
+        image = Image.open(image_path)
+        image = image.resize((150, 150))
+
+        # Create a PhotoImage object
+        self.photo = ImageTk.PhotoImage(image)
 
         # Create header label
-        header_label = tk.Label(self.master, text="Welcome Back!", font=("Arial", 40), fg="#ffffff", bg="#333333")
-        header_label.pack(pady=100)
+        header_label = tk.Label(self.master, text="Welcome Back To", font=("Arial", 40), fg="#ffffff", bg="#333333")
+        header_label.pack(pady=20)
+
+        # Create an image label
+        image_label = tk.Label(self.master, image=self.photo)
+        image_label.pack(pady=30)
 
         # Create form frame
         form_frame = tk.Frame(self.master, bg="#333333")
@@ -59,13 +71,13 @@ class LoginPage(tk.Frame):
 
         # Create forgot password label
         forgot_password_label = tk.Label(self.master, text="Forgot Password?", font=("Arial", 14), fg="#ffffff",
-                                         bg="#333333")
+                                         bg="#333333",cursor="hand2")
         forgot_password_label.pack(pady=10)
         forgot_password_label.bind("<Button-1>", lambda event: self.forgot_password())
 
         # Create create account label
         create_account_label = tk.Label(self.master, text="Don't have an account? Sign up now!", font=("Arial", 14),
-                                        fg="#ffffff", bg="#333333")
+                                        fg="#ffffff", bg="#333333",cursor="hand2")
         create_account_label.pack(pady=10)
         create_account_label.bind("<Button-1>", lambda event: self.open_signup_page())
 
@@ -83,10 +95,18 @@ class LoginPage(tk.Frame):
     def execute_query(self, query, *params):
         conn = sqlite3.connect('user.db')
         cursor = conn.cursor()
-        cursor.execute(query, params)
-        result = cursor.fetchone()
+
+        if query.lower().startswith('select'):
+            cursor.execute(query, params)
+            result = cursor.fetchone()
+        else:
+            cursor.execute(query, params)
+            result = None
+
+        conn.commit()
         cursor.close()
         conn.close()
+
         return result
 
     def login(self):
@@ -127,8 +147,6 @@ class LoginPage(tk.Frame):
                 messagebox.showerror("Error", "Email not found.")
         else:
             messagebox.showerror("Error", "Email not found.")
-
-
 
     def open_signup_page(self):
             # Destroy the current window
@@ -276,14 +294,14 @@ class SignupPage(tk.Frame):
         self.response_label.pack(pady=0)
 
         # Create back to login label
-        back_to_login_label = tk.Label(
+        back_to_login_label = tk.Button(
             self.master,
             text="Back to Login",
             font=("Arial", 14),
             fg="#ffffff",
             bg="#333333",
         )
-        back_to_login_label.pack(anchor="nw", padx=10, pady=0)
+        back_to_login_label.pack(anchor="w", padx=10)
         back_to_login_label.bind("<Button-1>", lambda event: self.open_login_page())
 
     def toggle_show_password(self):
