@@ -144,7 +144,9 @@ def create_task_manager(user_id):
             user_id = get_user_id()  # Replace with the actual user ID
 
             # Perform a database query to search for tasks of the specific user matching the search criteria
-            c.execute("SELECT TASK.task_name, TASK.description, CATEGORY.category_name, TASK.due_date, TASK.reminder_date, TASK.priority, TASK.status FROM TASK JOIN CATEGORY ON TASK.category_id = CATEGORY.category_id WHERE TASK.user_id = ? AND lower(TASK.task_name) LIKE ?",
+            c.execute("SELECT TASK.task_name, TASK.description, CATEGORY.category_name, TASK.due_date, TASK.reminder_date, "
+                      "TASK.priority, TASK.status FROM TASK JOIN CATEGORY ON TASK.category_id = CATEGORY.category_id WHERE TASK.user_id = ? "
+                      "AND lower(TASK.task_name) LIKE ?",
                       (user_id, '%' + search_text.lower() + '%',))
             matching_tasks = c.fetchall()
 
